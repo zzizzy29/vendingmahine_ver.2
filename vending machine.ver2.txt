@@ -1,0 +1,386 @@
+ <!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>자판기 재고 관리</title>
+
+<style>
+:root{
+    --bg:#f5f7fa;
+    --card:#ffffff;
+    --text:#222;
+    --accent:#2563eb;
+}
+
+.dark{
+    --bg:#111827;
+    --card:#1f2937;
+    --text:#f9fafb;
+}
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:sans-serif;
+}
+
+body{
+    background:var(--bg);
+    color:var(--text);
+    padding:20px;
+}
+
+h1{
+    margin-bottom:15px;
+}
+
+.top-bar{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:15px;
+}
+
+button{
+    border:none;
+    cursor:pointer;
+    padding:8px 12px;
+    border-radius:8px;
+    background:var(--accent);
+    color:white;
+}
+
+input{
+    padding:8px;
+    border-radius:8px;
+    border:1px solid #ccc;
+}
+
+.stats{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:10px;
+    margin-bottom:20px;
+}
+
+.stat{
+    background:var(--card);
+    padding:15px;
+    border-radius:12px;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:15px;
+}
+
+.card{
+    background:var(--card);
+    padding:15px;
+    border-radius:12px;
+}
+
+.product-header{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+}
+
+.icon{
+    font-size:2rem;
+}
+
+.stock{
+    font-size:1.2rem;
+    font-weight:bold;
+}
+
+.low{
+    color:#dc2626;
+}
+
+.soldout{
+    color:white;
+    background:#dc2626;
+    display:inline-block;
+    padding:3px 8px;
+    border-radius:8px;
+    margin-top:5px;
+}
+
+.controls{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+}
+
+.controls input{
+    width:80px;
+}
+
+.footer{
+    margin-top:25px;
+    font-size:0.9rem;
+}
+
+.locked{
+    opacity:0.5;
+    pointer-events:none;
+}
+</style>
+</head>
+<body>
+
+<h1>🥤 자판기 재고 관리</h1>
+
+<div class="top-bar">
+    <button onclick="toggleTheme()">🌙 다크모드</button>
+    <button onclick="adminLogin()">🔐 관리자 잠금</button>
+    <button onclick="resetData()">🗑 초기화</button>
+    <button onclick="exportCSV()">📤 CSV 내보내기</button>
+    <input type="file" id="csvFile" onchange="importCSV(event)">
+</div>
+
+<input
+id="search"
+placeholder="상품 검색..."
+oninput="renderProducts()"
+style="width:100%;margin-bottom:20px;"
+>
+
+<div class="stats">
+    <div class="stat">
+        <h3>상품 수</h3>
+        <div id="productCount">0</div>
+    </div>
+
+    <div class="stat">
+        <h3>총 재고</h3>
+        <div id="totalStock">0</div>
+    </div>
+
+    <div class="stat">
+        <h3>품절 상품</h3>
+        <div id="soldOutCount">0</div>
+    </div>
+</div>
+
+<div id="products" class="grid"></div>
+
+<div class="footer">
+    마지막 수정:
+    <span id="lastUpdate">-</span>
+</div>
+
+<script>
+
+const ADMIN_PIN = "1234";
+
+let isAdmin = false;
+
+let products = JSON.parse(localStorage.getItem("products")) || [
+    {name:"콜라",icon:"🥤",stock:10},
+    {name:"사이다",icon:"🍋",stock:8},
+    {name:"캔커피",icon:"☕",stock:5},
+    {name:"물",icon:"💧",stock:12},
+    {name:"핫식스",icon:"⚡",stock:3},
+    {name:"몬스터",icon:"👹",stock:2}
+];
+
+function saveData(){
+    localStorage.setItem("products",JSON.stringify(products));
+    localStorage.setItem("lastUpdate",new Date().toLocaleString());
+    updateStats();
+}
+
+function updateStats(){
+
+    document.getElementById("productCount").innerText =
+    products.length;
+
+    document.getElementById("totalStock").innerText =
+    products.reduce((a,b)=>a+b.stock,0);
+
+    document.getElementById("soldOutCount").innerText =
+    products.filter(p=>p.stock===0).length;
+
+    document.getElementById("lastUpdate").innerText =
+    localStorage.getItem("lastUpdate") || "-";
+}
+
+function renderProducts(){
+
+    const keyword =
+    document.getElementById("search").value.toLowerCase();
+
+    const container =
+    document.getElementById("products");
+
+    container.innerHTML="";
+
+    products
+    .filter(p=>p.name.toLowerCase().includes(keyword))
+    .forEach((p,index)=>{
+
+        const low = p.stock <=3;
+        const soldout = p.stock===0;
+
+        container.innerHTML += `
+        <div class="card">
+
+            <div class="product-header">
+                <div class="icon">${p.icon}</div>
+                <div>
+                    <h3>${p.name}</h3>
+                    <div class="stock ${low?'low':''}">
+                        재고 ${p.stock}개
+                    </div>
+                    ${soldout ? '<div class="soldout">품절</div>' : ''}
+                    ${low && !soldout ? '<div class="soldout">재고 부족</div>' : ''}
+                </div>
+            </div>
+
+            <div class="controls ${!isAdmin?'locked':''}">
+                <button onclick="changeStock(${index},1)">+</button>
+                <button onclick="changeStock(${index},-1)">-</button>
+
+                <input
+                type="number"
+                value="${p.stock}"
+                onchange="setStock(${index},this.value)">
+            </div>
+
+        </div>
+        `;
+    });
+
+    updateStats();
+}
+
+function changeStock(index,val){
+    if(!isAdmin) return;
+
+    products[index].stock += val;
+
+    if(products[index].stock < 0)
+        products[index].stock = 0;
+
+    saveData();
+    renderProducts();
+}
+
+function setStock(index,val){
+    if(!isAdmin) return;
+
+    products[index].stock =
+    Math.max(0,parseInt(val)||0);
+
+    saveData();
+    renderProducts();
+}
+
+function adminLogin(){
+
+    if(isAdmin){
+        isAdmin=false;
+        alert("관리자 모드 종료");
+        renderProducts();
+        return;
+    }
+
+    const pin =
+    prompt("관리자 PIN 입력");
+
+    if(pin===ADMIN_PIN){
+        isAdmin=true;
+        alert("관리자 모드 활성화");
+        renderProducts();
+    }else{
+        alert("PIN 오류");
+    }
+}
+
+function toggleTheme(){
+    document.body.classList.toggle("dark");
+}
+
+function resetData(){
+
+    if(!confirm("모든 재고를 0으로 초기화할까요?"))
+        return;
+
+    products.forEach(p=>p.stock=0);
+
+    saveData();
+    renderProducts();
+}
+
+function exportCSV(){
+
+    let csv="상품명,재고\n";
+
+    products.forEach(p=>{
+        csv += `${p.name},${p.stock}\n`;
+    });
+
+    const blob =
+    new Blob([csv],{type:'text/csv'});
+
+    const a =
+    document.createElement("a");
+
+    a.href =
+    URL.createObjectURL(blob);
+
+    a.download =
+    "vending_stock.csv";
+
+    a.click();
+}
+
+function importCSV(event){
+
+    const file = event.target.files[0];
+
+    if(!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = function(e){
+
+        const rows =
+        e.target.result.trim().split("\n");
+
+        rows.shift();
+
+        rows.forEach(row=>{
+
+            const [name,stock] =
+            row.split(",");
+
+            const item =
+            products.find(p=>p.name===name);
+
+            if(item){
+                item.stock =
+                parseInt(stock)||0;
+            }
+        });
+
+        saveData();
+        renderProducts();
+    }
+
+    reader.readAsText(file);
+}
+
+renderProducts();
+
+</script>
+
+</body>
+</html> 
