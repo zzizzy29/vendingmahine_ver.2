@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>자판기 재고 관리 시스템</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <h1>🥤 자판기 재고 관리 시스템</h1>
+
+    <div class="buttons">
+        <button on‍click="adminLogin()">관리자</button>
+        <button on‍click="toggleTheme()">다크모드</button>
+        <button on‍click="exportCSV()">CSV 저장</button>
+
+        <label class="upload">
+            CSV 불러오기
+            <input type="file" accept=".csv" on‍change="importCSV(event)" hidden>
+        </label>
+
+        <button on‍click="resetStock()">초기화</button>
+    </div>
+</header>
+
+<section class="stats">
+    <div class="box">
+        <h2 id="productCount">0</h2>
+        <p>상품 수</p>
+    </div>
+
+    <div class="box">
+        <h2 id="totalStock">0</h2>
+        <p>총 재고</p>
+    </div>
+
+    <div class="box">
+        <h2 id="soldOutCount">0</h2>
+        <p>품절</p>
+    </div>
+</section>
+
+<input
+    id="search"
+    placeholder="상품 검색"
+    oninput="renderProducts()"
+/>
+
+<div id="products" class="products"></div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
